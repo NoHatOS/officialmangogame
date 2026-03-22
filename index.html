@@ -2,46 +2,62 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>🥭 MANGO CHAOS 🥭</title>
+    <title>🥭 MANGO CHAOS: INMORTAL 🥭</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
         * { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Permanent Marker', cursive; }
-        canvas { display: block; background: #111; } /* Fondo gris oscuro por si falla el BG */
-        
-        #debug-info { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; font-size: 12px; pointer-events: none; z-index: 1000; background: rgba(0,0,0,0.5); padding: 5px; }
-        
+        canvas { display: block; background: #1a1a1a; }
+
+        /* UI GRAFFITI COMPACTA */
         #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; display: none; }
-        
+
+        #hud-life { 
+            position: absolute; top: 15px; left: 15px; width: 160px; height: 30px; 
+            border: 4px solid #fff; filter: url('#rough-edge'); box-shadow: 5px 5px 0 #f0f;
+        }
+        #hp-fill { width: 100%; height: 100%; background: #ff0055; }
+
+        #swag-box {
+            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+            width: 30px; height: 200px; border: 4px solid #0ff; filter: url('#rough-edge');
+            background: rgba(0,0,0,0.5); box-shadow: -5px 5px 0 #f0f;
+        }
+        #swag-fill { position: absolute; bottom: 0; width: 100%; height: 0%; background: #0ff; transition: 0.3s; }
+
+        #weapon-ui {
+            position: absolute; bottom: 20px; left: 20px; width: 80px; height: 80px;
+            border: 5px solid #ff0; border-radius: 50%; background: #000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            filter: url('#rough-edge'); box-shadow: 6px 0px 0 #f0f; transform: rotate(-5deg);
+        }
+
+        /* MENU */
         #menu {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.8);
+            position: absolute; inset: 0; background: #000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 1000; pointer-events: all;
         }
-
         .btn-play {
-            font-family: 'Permanent Marker'; font-size: 50px; color: #ff0; background: #222; 
-            border: 4px solid #f0f; padding: 10px 40px; cursor: pointer; text-shadow: 3px 3px 0 #000;
-            box-shadow: 5px 5px 0 #0ff;
+            font-family: 'Permanent Marker'; font-size: 50px; color: #ff0; background: none; 
+            border: 4px solid #f0f; padding: 10px 30px; cursor: pointer; filter: url('#rough-edge');
         }
-
-        #hud-life { position: absolute; top: 20px; left: 20px; width: 150px; height: 20px; border: 2px solid #fff; background: #333; }
-        #hp-fill { width: 100%; height: 100%; background: #ff0055; }
     </style>
 </head>
 <body>
 
-<div id="debug-info">Cargando...</div>
+<svg><filter id="rough-edge"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise" /><feDisplacementMap in="SourceGraphic" in2="noise" scale="6" /></filter></svg>
 
 <div id="menu">
-    <h1 style="font-size: 80px; color: white; text-shadow: 5px 5px #f0f; margin-bottom: 20px;">MANGO CHAOS</h1>
-    <p id="audio-status" style="color: #f00; margin-bottom: 20px;">Música no encontrada (menu_musicc.mp3)</p>
-    <button class="btn-play" onclick="startGame()">START GAME</button>
+    <h1 style="font-size: 70px; color: white; text-shadow: 6px 6px #f0f; margin-bottom: 30px;">MANGO CHAOS</h1>
+    <button class="btn-play" onclick="startGame()">START</button>
 </div>
 
 <div id="ui">
     <div id="hud-life"><div id="hp-fill"></div></div>
-    <div style="position:absolute; bottom:20px; left:20px; color:#ff0; font-size:25px; text-shadow: 2px 2px #000;">
-        AMMO: <span id="ammo-txt">25</span>
+    <div id="swag-box"><div id="swag-fill"></div></div>
+    <div id="weapon-ui">
+        <img id="wpn-img" src="pistola.png" style="width: 45px; filter: drop-shadow(0 0 5px gold);">
+        <div id="ammo-txt" style="font-size: 20px; color: #ff0;">25</div>
     </div>
 </div>
 
@@ -50,58 +66,25 @@
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const debug = document.getElementById('debug-info');
 
-const assets = {
-    p: { src: 'jugador.png', img: new Image(), loaded: false },
-    bg: { src: 'fondo_ciudad.jpg', img: new Image(), loaded: false },
-    floor: { src: 'suelo_pasto.png', img: new Image(), loaded: false },
-    music: { src: 'menu_musicc.mp3', audio: new Audio(), loaded: false }
-};
+// --- IMÁGENES (Si fallan, el juego sigue) ---
+const S = { p: new Image(), bg: new Image(), floor: new Image() };
+S.p.src = 'jugador.png'; S.bg.src = 'fondo_ciudad.jpg'; S.floor.src = 'suelo_pasto.png';
 
-// --- CARGA DE ASSETS ---
-let loadedCount = 0;
-const totalAssets = 4;
-
-function checkProgress() {
-    loadedCount++;
-    debug.innerHTML = `RECURSOS: ${loadedCount}/${totalAssets}`;
-    if (assets.music.loaded) document.getElementById('audio-status').style.color = "#0f0";
-}
-
-Object.entries(assets).forEach(([key, val]) => {
-    if(key === 'music') {
-        val.audio.src = val.src;
-        val.audio.oncanplaythrough = () => { val.loaded = true; checkProgress(); };
-        val.audio.onerror = () => { 
-            console.log("Error de audio");
-            checkProgress(); // Marcamos como "listo" para que el botón funcione igual
-        };
-    } else {
-        val.img.src = val.src;
-        val.img.onload = () => { val.loaded = true; checkProgress(); };
-        val.img.onerror = () => { 
-            debug.innerHTML += `<br>⚠️ Falló: ${val.src}`;
-            checkProgress(); 
-        };
-    }
-});
-
-const game = { active: false, camX: 0, bullets: [] };
-const player = { x: 200, y: 100, vx: 0, vy: 0, w: 80, h: 90, dir: 1, grounded: false, ammo: 25 };
+const game = { active: false, swag: 0, camX: 0, bullets: [] };
+const player = { x: 100, y: 100, vx: 0, vy: 0, w: 70, h: 80, dir: 1, grounded: false, ammo: 25 };
 const keys = {};
 
 function startGame() {
     document.getElementById('menu').style.display = 'none';
     document.getElementById('ui').style.display = 'block';
     game.active = true;
-    if(assets.music.loaded) {
-        assets.music.audio.loop = true;
-        assets.music.audio.play();
-    }
 }
 
-window.onkeydown = e => keys[e.code] = true;
+window.onkeydown = e => {
+    keys[e.code] = true;
+    if(e.code === 'KeyQ') { player.vx = player.dir * 35; game.swag = Math.min(100, game.swag + 5); }
+};
 window.onkeyup = e => keys[e.code] = false;
 window.onmousedown = () => {
     if(game.active && player.ammo > 0) {
@@ -113,17 +96,17 @@ window.onmousedown = () => {
 
 function update() {
     if(game.active) {
-        let speed = 1.2;
-        if(keys.KeyD) { player.vx += speed; player.dir = 1; }
-        if(keys.KeyA) { player.vx -= speed; player.dir = -1; }
-        if(keys.Space && player.grounded) { player.vy = -18; player.grounded = false; }
+        let spd = 1.2 + (game.swag/100);
+        if(keys.KeyD) { player.vx += spd; player.dir = 1; }
+        if(keys.KeyA) { player.vx -= spd; player.dir = -1; }
+        if(keys.Space && player.grounded) { player.vy = -17; player.grounded = false; game.swag = Math.min(100, game.swag + 1); }
 
         player.vx *= 0.88; player.vy += 0.8;
         player.x += player.vx; player.y += player.vy;
 
-        // Suelo fijo
         if(player.y > canvas.height - 180) { player.y = canvas.height - 180; player.vy = 0; player.grounded = true; }
         game.camX = player.x - canvas.width/3;
+        document.getElementById('swag-fill').style.height = game.swag + '%';
     }
     draw();
     requestAnimationFrame(update);
@@ -133,45 +116,38 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if(!game.active) return;
 
-    // Dibujar Fondo
-    if(assets.bg.loaded) {
-        let bgX = -(game.camX * 0.3) % canvas.width;
-        ctx.drawImage(assets.bg.img, bgX, 0, canvas.width, canvas.height);
-        ctx.drawImage(assets.bg.img, bgX + canvas.width, 0, canvas.width, canvas.height);
-    }
-
-    // Dibujar Suelo
-    if(assets.floor.loaded) {
-        let flX = -game.camX % 200;
-        for(let i=-200; i<canvas.width+200; i+=200) {
-            ctx.drawImage(assets.floor.img, i + flX, canvas.height-100, 200, 100);
-        }
+    // FONDO (Si no hay imagen, fondo azul oscuro)
+    if(S.bg.complete && S.bg.width > 0) {
+        ctx.drawImage(S.bg, -(game.camX*0.2)%canvas.width, 0, canvas.width, canvas.height);
     } else {
-        ctx.fillStyle = "#333";
-        ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+        ctx.fillStyle = "#001a33"; ctx.fillRect(0,0,canvas.width, canvas.height);
     }
 
-    // Dibujar Balas
+    // SUELO (Si no hay imagen, rectangulo verde)
+    if(S.floor.complete && S.floor.width > 0) {
+        for(let i=0; i<15; i++) ctx.drawImage(S.floor, (i*200)-(game.camX%200), canvas.height-100, 200, 100);
+    } else {
+        ctx.fillStyle = "#004400"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+    }
+
+    // BALAS
     ctx.fillStyle = "#ff0";
     game.bullets.forEach((b, i) => {
         b.x += b.vx;
-        ctx.fillRect(b.x - game.camX, b.y, 15, 6);
+        ctx.fillRect(b.x - game.camX, b.y, 15, 5);
         if(Math.abs(b.x - player.x) > 1000) game.bullets.splice(i,1);
     });
 
-    // Dibujar Jugador
+    // JUGADOR (Si no hay imagen, MANGO NARANJA)
     ctx.save();
-    ctx.translate(player.x - game.camX, player.y);
-    if(player.dir === -1) { ctx.translate(player.w, 0); ctx.scale(-1, 1); }
-    
-    if(assets.p.loaded) {
-        ctx.drawImage(assets.p.img, 0, 0, player.w, player.h);
+    ctx.translate(player.x - game.camX + player.w/2, player.y + player.h/2);
+    if(player.dir === -1) ctx.scale(-1, 1);
+    if(S.p.complete && S.p.width > 0) {
+        ctx.drawImage(S.p, -player.w/2, -player.h/2, player.w, player.h);
     } else {
         ctx.fillStyle = "orange";
-        ctx.fillRect(0, 0, player.w, player.h);
-        ctx.fillStyle = "black";
-        ctx.font = "10px Arial";
-        ctx.fillText("MANGO", 5, 20);
+        ctx.beginPath(); ctx.ellipse(0, 0, player.w/2, player.h/2, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "black"; ctx.fillText("MANGO", -20, 0);
     }
     ctx.restore();
 }
