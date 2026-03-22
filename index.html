@@ -2,209 +2,256 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>🥭 MANGO CHAOS: THE ADVENTURE 🥭</title>
+    <title>🥭 MANGO CHAOS: GRAFFITI SHITPOST 🥭</title>
     <style>
-        * { margin: 0; padding: 0; overflow: hidden; }
-        body { background: #000; font-family: 'Impact', sans-serif; }
-        canvas { display: block; filter: contrast(1.1) brightness(1.1); }
-
-        /* UI */
-        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
-        #hud { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px #000; }
-        .hp-bar { width: 300px; height: 35px; background: rgba(0,0,0,0.8); border: 4px solid #fff; }
-        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff8800); transition: 0.1s; }
+        @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
         
-        /* SHITPOST DIALOGS */
-        #dialog-box {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            width: 85%; max-width: 900px; background: rgba(5, 5, 5, 0.95);
-            border: 6px solid #ff8800; padding: 25px; display: none; pointer-events: all;
-            box-shadow: 0 0 50px rgba(255,136,0,0.3);
-        }
-        #p-img { width: 100px; height: 100px; float: left; border: 3px solid #fff; margin-right: 20px; }
-        #p-name { color: #ff8800; font-size: 28px; margin-bottom: 10px; }
-        #p-text { color: #fff; font-size: 24px; line-height: 1.2; }
+        * { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; }
+        body { background: #000; font-family: 'Permanent Marker', cursive; color: white; }
+        canvas { display: block; filter: contrast(1.1) saturate(1.3); }
 
-        /* BOSS BAR */
-        #boss-ui { position: absolute; top: 20px; width: 100%; text-align: center; display: none; }
-        .boss-hp { width: 60%; height: 20px; background: #200; border: 2px solid #f00; display: inline-block; }
-        #boss-fill { width: 100%; height: 100%; background: #f00; }
+        /* --- FILTROS SVG PARA EFECTO GRAFFITI/SPRAY --- */
+        svg { width: 0; height: 0; position: absolute; }
+
+        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
+
+        /* MENU INICIAL */
+        #menu {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; pointer-events: all;
+            border: 20px solid transparent;
+            border-image: radial-gradient(#f0f, #0ff) 1;
+        }
+        
+        .btn-play {
+            font-family: 'Permanent Marker'; font-size: 90px; color: #ff0; background: none; border: none;
+            cursor: pointer; text-shadow: 8px 8px 0 #f0f; transition: 0.2s;
+            filter: url('#rough-edge');
+        }
+        .btn-play:hover { transform: scale(1.1) rotate(-5deg); color: #0ff; }
+
+        /* HUD: VIDA (Temblorosa) */
+        #hud-life {
+            position: absolute; top: 30px; left: 30px;
+            width: 280px; height: 65px; background: rgba(0,0,0,0.7);
+            border: 5px solid #fff; filter: url('#rough-edge');
+            box-shadow: 10px 10px 0 #f0f; transform: rotate(-2deg);
+        }
+        #hp-fill { width: 100%; height: 100%; background: #ff0055; transition: 0.2s; }
+
+        /* SWAG BAR (Lateral Derecha) */
+        #swag-box {
+            position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+            width: 55px; height: 380px; border: 6px solid #0ff;
+            filter: url('#rough-edge'); box-shadow: -10px 10px 0 #f0f;
+            background: rgba(0,0,0,0.6);
+        }
+        #swag-fill { position: absolute; bottom: 0; width: 100%; height: 0%; background: #0ff; transition: 0.4s; }
+
+        /* CIRCULO DE ARMA (Esquina Inferior Izquierda) */
+        #weapon-ui {
+            position: absolute; bottom: 40px; left: 40px;
+            width: 140px; height: 140px; border: 8px solid #ff0;
+            border-radius: 50%; background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            filter: url('#rough-edge'); box-shadow: 12px 0px 0 #f0f;
+            transform: rotate(-8deg);
+        }
+
+        /* CUADRO DE DIÁLOGO (Estilo Graffiti) */
+        #dialog {
+            position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+            width: 85%; min-height: 180px; background: rgba(10,10,10,0.95);
+            border: 8px solid #0ff; padding: 30px; display: none; pointer-events: all;
+            filter: url('#rough-edge'); box-shadow: 0 0 50px #f0f;
+            border-radius: 40px 10px 50px 5px;
+        }
+
+        /* CINEMATICA CARGA */
+        #loading {
+            position: absolute; inset: 0; background: #000; display: none;
+            z-index: 500; flex-direction: column; align-items: center; justify-content: center;
+        }
     </style>
 </head>
 <body>
 
-<canvas id="c"></canvas>
+<svg>
+  <filter id="rough-edge">
+    <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" />
+  </filter>
+</svg>
+
+<div id="menu">
+    <h1 style="font-size: 130px; color: #fff; text-shadow: 12px 12px 0 #f0f; transform: rotate(-3deg);">MANGO CHAOS</h1>
+    <p style="color: #0ff; font-size: 25px; margin-bottom: 40px;">THE SHITPOST ADVENTURE</p>
+    <button class="btn-play" onclick="startGame()">START</button>
+</div>
+
+<div id="loading">
+    <h2 id="load-text" style="font-size: 60px; color: #ff0; text-shadow: 4px 4px #000;">LOADING CHAOS...</h2>
+    <img src="jugador.png" style="width: 180px; animation: spin 1.5s infinite linear; margin-top: 30px;">
+</div>
+
 <div id="ui">
-    <div id="hud">
-        <div style="font-size: 20px;">MANGO'S WILL TO LIVE</div>
-        <div class="hp-bar"><div id="hp-fill"></div></div>
-        <div id="weapon-ui" style="font-size: 24px; color: #ff0; margin-top: 5px;">WEAPON: GLOCK</div>
+    <div id="hud-life"><div id="hp-fill"></div></div>
+    
+    <div id="swag-box">
+        <div id="swag-fill"></div>
+        <p style="transform: rotate(-90deg); position: absolute; left: -90px; top: 50%; color: #0ff; font-size: 35px; letter-spacing: 5px;">SWAG</p>
     </div>
 
-    <div id="boss-ui">
-        <div id="boss-name" style="color: red; font-size: 30px; text-shadow: 2px 2px #000;">CHEF RAMSAY</div>
-        <div class="boss-hp"><div id="boss-fill"></div></div>
+    <div id="weapon-ui">
+        <img id="cur-wpn-img" src="pistola.png" style="width: 80px;">
+        <div id="ammo-count" style="font-size: 30px; color: #ff0;">25</div>
+        <div id="cd-layer" style="position: absolute; bottom: 0; width: 100%; height: 0%; background: rgba(255,255,0,0.3); border-radius: 50%;"></div>
     </div>
 
-    <div id="dialog-box" onclick="game.nextDialog()">
-        <img id="p-img" src="jugador.png">
-        <div id="p-name">Mango</div>
-        <div id="p-text">...</div>
-        <div style="color:#444; font-size:14px; margin-top:10px;">[CLICK TO CONTINUE]</div>
+    <div id="dialog" onclick="game.nextDialog()">
+        <img id="d-portrait" src="esposa.png" style="width: 130px; float: left; margin-right: 25px; border: 5px solid #fff; filter: url('#rough-edge');">
+        <h2 id="d-name" style="color: #f0f; font-size: 40px; text-decoration: underline;">NAME</h2>
+        <p id="d-text" style="font-size: 28px; margin-top: 15px; line-height: 1.2;"></p>
     </div>
 </div>
+
+<canvas id="c"></canvas>
 
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-// --- CARGA DE IMÁGENES ---
-const S = {}; 
-const files = {
-    p: 'jugador.png', wife: 'esposa.png', kiwi: 'dr_kiwi.png',
-    gun: 'pistola.png', smg: 'metralleta.png', baz: 'bazuca.png',
-    b: 'bala.png', m: 'misil.png', grass: 'suelo_pasto.png', metal: 'suelo_metal.png',
-    city: 'fondo_ciudad.jpg', clinic: 'interior_clinica.jpg', final: 'fondo_final.png',
-    boom: 'explosion.png', sandia: 'enemigo_sandia.png', chef: 'chef.png', blender: 'licuadora.png'
+// --- SISTEMA DE AUDIO ---
+const audio = {
+    menu: new Audio('menu_musicc.mp3'), // Nombre corregido
+    ambient: [new Audio('ambient_music1.mp3'), new Audio('ambient_music2.mp3'), new Audio('ambient_music3.mp3')],
+    action: [new Audio('action_music.mp3'), new Audio('action_music2.mp3'), new Audio('action_music3.mp3')],
+    current: null,
+    
+    play(sound) {
+        if(this.current) { this.current.pause(); this.current.currentTime = 0; }
+        this.current = sound;
+        this.current.loop = true;
+        this.current.play().catch(e => console.log("Audio waiting for interaction"));
+    }
 };
 
-Object.entries(files).forEach(([k, v]) => { S[k] = new Image(); S[k].src = v; });
+// Activar música de menú al primer click en la pantalla (requisito de navegadores)
+window.addEventListener('mousedown', () => {
+    if(!game.active && audio.current !== audio.menu) {
+        audio.play(audio.menu);
+    }
+}, { once: true });
 
-// --- LÓGICA DEL JUEGO ---
+// --- LÓGICA DE JUEGO ---
 const game = {
-    lvl: 1, camX: 0, shake: 0, 
-    state: 'PLAYING', dialogIdx: 0, curScript: null,
-    bullets: [], enemies: [], particles: [],
-
-    // EL GUIÓN (Shitpost real)
+    active: false,
+    state: 'PLAYING',
+    swag: 0,
+    lvl: 0,
+    inventory: { gun: 25, smg: 0, rpg: 0 },
     scripts: {
-        intro: [
-            { n: "Wife", t: "Mango, you smell like trash. Go to the doctor.", i: 'wife' },
-            { n: "Mango", t: "You're just jealous of my drip. Fine, I'll go.", i: 'p' }
-        ],
-        clinic: [
-            { n: "Dr. Kiwi", t: "Bruh, you have 5 minutes left. The Chef poisoned your soil.", i: 'kiwi' },
-            { n: "Mango", t: "Ayo? That's personal. Where is he?", i: 'p' },
-            { n: "Dr. Kiwi", t: "Go to the industrial kitchen. Bring a bazooka.", i: 'kiwi' }
+        tutorial: [
+            { n: "WIFE", t: "YO! You look huge today. Use A/D and SPACE to move. Q to DASH.", i: "esposa.png" },
+            { n: "WIFE", t: "Go see Dr. Kiwi. He says you're literally rotting from inside. GO!", i: "esposa.png" }
         ]
-    },
-
-    startDialog(key) {
-        this.state = 'DIALOG';
-        this.curScript = this.scripts[key];
-        this.dialogIdx = 0;
-        document.getElementById('dialog-box').style.display = 'block';
-        this.renderLine();
-    },
-
-    renderLine() {
-        const d = this.curScript[this.dialogIdx];
-        document.getElementById('p-name').innerText = d.n;
-        document.getElementById('p-text').innerText = d.t;
-        document.getElementById('p-img').src = files[d.i];
-    },
-
-    nextDialog() {
-        this.dialogIdx++;
-        if(this.dialogIdx >= this.curScript.length) {
-            document.getElementById('dialog-box').style.display = 'none';
-            this.state = 'PLAYING';
-            if(this.lvl === 1) this.lvl = 2; // Avanzar nivel tras hablar
-        } else this.renderLine();
     }
 };
 
 const player = {
-    x: 100, y: 0, vx: 0, vy: 0, w: 80, h: 90,
-    hp: 100, dir: 1, ang: 0, ground: false, weapon: 'gun'
+    x: 200, y: 0, vx: 0, vy: 0, w: 120, h: 130, // Mango grande
+    hp: 100, dir: 1, weapon: 'gun', grounded: false
 };
 
-// --- INPUTS ---
-const keys = {};
-window.onkeydown = e => {
-    keys[e.code] = true;
-    if(e.code === 'Digit1') { player.weapon = 'gun'; document.getElementById('weapon-ui').innerText = "WEAPON: GLOCK"; }
-    if(e.code === 'Digit2') { player.weapon = 'smg'; document.getElementById('weapon-ui').innerText = "WEAPON: UZI"; }
-    if(e.code === 'Digit3') { player.weapon = 'baz'; document.getElementById('weapon-ui').innerText = "WEAPON: RPG-7"; }
-};
-window.onkeyup = e => keys[e.code] = false;
-window.onmousedown = () => { if(game.state === 'PLAYING') shoot(); };
-
-function shoot() {
-    game.shake = player.weapon === 'baz' ? 20 : 8;
-    game.bullets.push({
-        x: player.x + (player.dir*50), y: player.y + 40,
-        vx: player.dir * 25, type: player.weapon === 'baz' ? 'm' : 'b'
+function startGame() {
+    document.getElementById('menu').style.display = 'none';
+    showCinematic("MISSION 1: ESCAPE THE HOUSE", () => {
+        game.active = true;
+        game.state = 'DIALOG';
+        game.curS = game.scripts.tutorial;
+        game.dIdx = 0;
+        showDialog();
+        audio.play(audio.ambient[0]); // Cambia a música de ambiente
     });
-    player.vx -= player.dir * (player.weapon === 'baz' ? 15 : 4); // Retroceso
 }
 
-// --- LOOP ---
-function update() {
-    if(game.state === 'PLAYING') {
-        if(keys.KeyD) { player.vx += 1.5; player.dir = 1; }
-        if(keys.KeyA) { player.vx -= 1.5; player.dir = -1; }
-        if(keys.Space && player.ground) { player.vy = -22; player.ground = false; }
+function showCinematic(text, callback) {
+    const loading = document.getElementById('loading');
+    document.getElementById('load-text').innerText = text;
+    loading.style.display = 'flex';
+    setTimeout(() => {
+        loading.style.display = 'none';
+        callback();
+    }, 2500);
+}
 
-        player.vx *= 0.85; player.vy += 0.8;
+function showDialog() {
+    const d = game.curS[game.dIdx];
+    document.getElementById('dialog').style.display = 'block';
+    document.getElementById('d-name').innerText = d.n;
+    document.getElementById('d-text').innerText = d.t;
+    document.getElementById('d-portrait').src = d.i;
+}
+
+game.nextDialog = function() {
+    this.dIdx++;
+    if(this.dIdx >= this.curS.length) {
+        document.getElementById('dialog').style.display = 'none';
+        this.state = 'PLAYING';
+    } else showDialog();
+};
+
+function addSwag(amt) {
+    game.swag = Math.min(100, game.swag + amt);
+    document.getElementById('swag-fill').style.height = game.swag + '%';
+}
+
+// --- LOOP DE RENDER ---
+function update() {
+    if(game.active && game.state === 'PLAYING') {
+        let spd = 1.4 + (game.swag/100);
+        if(keys.KeyD) { player.vx += spd; player.dir = 1; }
+        if(keys.KeyA) { player.vx -= spd; player.dir = -1; }
+        if(keys.Space && player.grounded) { player.vy = -20; player.grounded = false; addSwag(3); }
+
+        player.vx *= 0.88; player.vy += 0.8;
         player.x += player.vx; player.y += player.vy;
 
-        if(player.y > canvas.height - 180) { player.y = canvas.height - 180; player.vy = 0; player.ground = true; }
-        
-        player.ang = (player.vx * 0.05) + (player.vy * 0.02);
-        game.camX = player.x - canvas.width/3;
-
-        // Triggers de historia
-        if(player.x > 600 && game.lvl === 1 && game.state !== 'DIALOG') game.startDialog('intro');
-        if(player.x > 1500 && game.lvl === 2 && game.state !== 'DIALOG') game.startDialog('clinic');
+        if(player.y > canvas.height - 230) { player.y = canvas.height - 230; player.vy = 0; player.grounded = true; }
     }
-
-    if(game.shake > 0) game.shake *= 0.9;
     draw();
     requestAnimationFrame(update);
 }
 
 function draw() {
-    ctx.save();
-    if(game.shake > 1) ctx.translate(Math.random()*game.shake, Math.random()*game.shake);
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    if(!game.active) return;
+    
+    // Suelo placeholder
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, canvas.height-100, canvas.width, 100);
 
-    // DIBUJAR FONDO SEGÚN NIVEL
-    const bg = game.lvl === 1 ? S.city : (game.lvl === 2 ? S.clinic : S.final);
-    if(bg.complete) ctx.drawImage(bg, -(game.camX*0.2)%canvas.width, 0, canvas.width, canvas.height);
-    if(bg.complete) ctx.drawImage(bg, -(game.camX*0.2)%canvas.width + canvas.width, 0, canvas.width, canvas.height);
-
-    // SUELO
-    const fl = game.lvl === 3 ? S.metal : S.grass;
-    if(fl.complete) {
-        for(let i=0; i<15; i++) ctx.drawImage(fl, (i*250)-(game.camX%250), canvas.height-100, 250, 100);
-    }
-
-    // PERSONAJES DE LA HISTORIA
-    if(game.lvl === 1 && S.wife.complete) ctx.drawImage(S.wife, 700 - game.camX, canvas.height - 180, 80, 90);
-    if(game.lvl === 2 && S.kiwi.complete) ctx.drawImage(S.kiwi, 1600 - game.camX, canvas.height - 180, 80, 90);
-
-    // JUGADOR
-    ctx.save();
-    ctx.translate(player.x - game.camX + player.w/2, player.y + player.h/2);
-    ctx.rotate(player.ang);
-    if(player.dir === -1) ctx.scale(-1, 1);
-    ctx.drawImage(S.p, -player.w/2, -player.h/2, player.w, player.h);
-    if(S[player.weapon]) ctx.drawImage(S[player.weapon], 20, 0, 60, 40);
-    ctx.restore();
-
-    // BALAS
-    game.bullets.forEach((b, i) => {
-        b.x += b.vx;
-        if(S[b.type]) ctx.drawImage(S[b.type], b.x - game.camX, b.y, 35, 15);
-        if(Math.abs(b.x - player.x) > 1500) game.bullets.splice(i, 1);
-    });
-
-    ctx.restore();
+    // Jugador placeholder (aquí se cargan tus .png)
+    ctx.fillStyle = "orange";
+    ctx.fillRect(player.x - (player.x/2), player.y, player.w, player.h);
 }
+
+const keys = {};
+window.onkeydown = e => { 
+    keys[e.code] = true; 
+    if(e.code === 'KeyQ') { player.vx = player.dir * 50; addSwag(5); }
+};
+window.onkeyup = e => keys[e.code] = false;
 
 window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
 window.onresize();
 update();
 </script>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+
 </body>
 </html>
