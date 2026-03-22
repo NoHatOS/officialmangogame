@@ -6,40 +6,41 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
         * { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Permanent Marker', cursive; }
-        canvas { display: block; }
+        canvas { display: block; background: #111; } /* Fondo gris oscuro por si falla el BG */
         
-        #debug-info { position: absolute; top: 0; left: 0; color: lime; font-family: monospace; font-size: 10px; pointer-events: none; z-index: 1000; }
+        #debug-info { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; font-size: 12px; pointer-events: none; z-index: 1000; background: rgba(0,0,0,0.5); padding: 5px; }
         
         #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; display: none; }
         
         #menu {
-            position: absolute; inset: 0; background: #111;
+            position: absolute; inset: 0; background: rgba(0,0,0,0.8);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 1000; pointer-events: all; border: 5px solid #f0f;
+            z-index: 1000; pointer-events: all;
         }
 
         .btn-play {
-            font-size: 50px; color: #ff0; background: none; border: 3px solid #ff0;
-            padding: 10px 30px; cursor: pointer; text-shadow: 3px 3px 0 #f0f;
+            font-family: 'Permanent Marker'; font-size: 50px; color: #ff0; background: #222; 
+            border: 4px solid #f0f; padding: 10px 40px; cursor: pointer; text-shadow: 3px 3px 0 #000;
+            box-shadow: 5px 5px 0 #0ff;
         }
 
-        #hud-life { position: absolute; top: 15px; left: 15px; width: 150px; height: 25px; border: 2px solid #fff; }
-        #hp-fill { width: 100%; height: 100%; background: red; }
+        #hud-life { position: absolute; top: 20px; left: 20px; width: 150px; height: 20px; border: 2px solid #fff; background: #333; }
+        #hp-fill { width: 100%; height: 100%; background: #ff0055; }
     </style>
 </head>
 <body>
 
-<div id="debug-info">Cargando recursos...</div>
+<div id="debug-info">Cargando...</div>
 
 <div id="menu">
-    <h1 style="font-size: 60px; color: white; margin-bottom: 20px;">MANGO CHAOS</h1>
-    <p style="color: #0ff; margin-bottom: 20px;">HAZ CLIC PARA ACTIVAR MÚSICA Y JUGAR</p>
-    <button class="btn-play" onclick="startGame()">START</button>
+    <h1 style="font-size: 80px; color: white; text-shadow: 5px 5px #f0f; margin-bottom: 20px;">MANGO CHAOS</h1>
+    <p id="audio-status" style="color: #f00; margin-bottom: 20px;">Música no encontrada (menu_musicc.mp3)</p>
+    <button class="btn-play" onclick="startGame()">START GAME</button>
 </div>
 
 <div id="ui">
     <div id="hud-life"><div id="hp-fill"></div></div>
-    <div id="weapon-box" style="position:absolute; bottom:20px; left:20px; color:yellow; font-size:20px;">
+    <div style="position:absolute; bottom:20px; left:20px; color:#ff0; font-size:25px; text-shadow: 2px 2px #000;">
         AMMO: <span id="ammo-txt">25</span>
     </div>
 </div>
@@ -51,7 +52,6 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const debug = document.getElementById('debug-info');
 
-// --- CARGA DE ARCHIVOS CON VERIFICACIÓN ---
 const assets = {
     p: { src: 'jugador.png', img: new Image(), loaded: false },
     bg: { src: 'fondo_ciudad.jpg', img: new Image(), loaded: false },
@@ -59,40 +59,46 @@ const assets = {
     music: { src: 'menu_musicc.mp3', audio: new Audio(), loaded: false }
 };
 
+// --- CARGA DE ASSETS ---
 let loadedCount = 0;
+const totalAssets = 4;
+
+function checkProgress() {
+    loadedCount++;
+    debug.innerHTML = `RECURSOS: ${loadedCount}/${totalAssets}`;
+    if (assets.music.loaded) document.getElementById('audio-status').style.color = "#0f0";
+}
+
 Object.entries(assets).forEach(([key, val]) => {
     if(key === 'music') {
         val.audio.src = val.src;
-        val.audio.oncanplaythrough = () => { val.loaded = true; checkAllLoaded(); };
-        val.audio.onerror = () => { debug.innerHTML += `<br>❌ Error Audio: ${val.src}`; };
+        val.audio.oncanplaythrough = () => { val.loaded = true; checkProgress(); };
+        val.audio.onerror = () => { 
+            console.log("Error de audio");
+            checkProgress(); // Marcamos como "listo" para que el botón funcione igual
+        };
     } else {
         val.img.src = val.src;
-        val.img.onload = () => { val.loaded = true; checkAllLoaded(); };
-        val.img.onerror = () => { debug.innerHTML += `<br>❌ Error Imagen: ${val.src}`; };
+        val.img.onload = () => { val.loaded = true; checkProgress(); };
+        val.img.onerror = () => { 
+            debug.innerHTML += `<br>⚠️ Falló: ${val.src}`;
+            checkProgress(); 
+        };
     }
 });
 
-function checkAllLoaded() {
-    loadedCount++;
-    debug.innerHTML = `Recursos: ${loadedCount}/4 cargados.`;
-}
-
-// --- AUDIO ---
-function playMenuMusic() {
-    assets.music.audio.loop = true;
-    assets.music.audio.play().catch(e => console.log("Audio block"));
-}
-
-// --- JUEGO ---
 const game = { active: false, camX: 0, bullets: [] };
-const player = { x: 100, y: 100, vx: 0, vy: 0, w: 60, h: 70, dir: 1, grounded: false, ammo: 25 };
+const player = { x: 200, y: 100, vx: 0, vy: 0, w: 80, h: 90, dir: 1, grounded: false, ammo: 25 };
 const keys = {};
 
 function startGame() {
     document.getElementById('menu').style.display = 'none';
     document.getElementById('ui').style.display = 'block';
     game.active = true;
-    playMenuMusic();
+    if(assets.music.loaded) {
+        assets.music.audio.loop = true;
+        assets.music.audio.play();
+    }
 }
 
 window.onkeydown = e => keys[e.code] = true;
@@ -101,20 +107,22 @@ window.onmousedown = () => {
     if(game.active && player.ammo > 0) {
         player.ammo--;
         document.getElementById('ammo-txt').innerText = player.ammo;
-        game.bullets.push({x: player.x + 30, y: player.y + 30, vx: player.dir * 12});
+        game.bullets.push({x: player.x + (player.dir*40), y: player.y + 40, vx: player.dir * 15});
     }
 };
 
 function update() {
     if(game.active) {
-        if(keys.KeyD) { player.vx += 1; player.dir = 1; }
-        if(keys.KeyA) { player.vx -= 1; player.dir = -1; }
-        if(keys.Space && player.grounded) { player.vy = -15; player.grounded = false; }
+        let speed = 1.2;
+        if(keys.KeyD) { player.vx += speed; player.dir = 1; }
+        if(keys.KeyA) { player.vx -= speed; player.dir = -1; }
+        if(keys.Space && player.grounded) { player.vy = -18; player.grounded = false; }
 
-        player.vx *= 0.9; player.vy += 0.7;
+        player.vx *= 0.88; player.vy += 0.8;
         player.x += player.vx; player.y += player.vy;
 
-        if(player.y > canvas.height - 150) { player.y = canvas.height - 150; player.vy = 0; player.grounded = true; }
+        // Suelo fijo
+        if(player.y > canvas.height - 180) { player.y = canvas.height - 180; player.vy = 0; player.grounded = true; }
         game.camX = player.x - canvas.width/3;
     }
     draw();
@@ -122,31 +130,36 @@ function update() {
 }
 
 function draw() {
-    ctx.fillStyle = "#111"; // Fondo oscuro por si falla la imagen
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     if(!game.active) return;
 
-    // Fondo
+    // Dibujar Fondo
     if(assets.bg.loaded) {
-        ctx.drawImage(assets.bg.img, -(game.camX*0.2)%canvas.width, 0, canvas.width, canvas.height);
+        let bgX = -(game.camX * 0.3) % canvas.width;
+        ctx.drawImage(assets.bg.img, bgX, 0, canvas.width, canvas.height);
+        ctx.drawImage(assets.bg.img, bgX + canvas.width, 0, canvas.width, canvas.height);
     }
 
-    // Suelo
-    ctx.fillStyle = "#222";
-    ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+    // Dibujar Suelo
     if(assets.floor.loaded) {
-        for(let i=0; i<10; i++) ctx.drawImage(assets.floor.img, (i*200)-(game.camX%200), canvas.height-80, 200, 80);
+        let flX = -game.camX % 200;
+        for(let i=-200; i<canvas.width+200; i+=200) {
+            ctx.drawImage(assets.floor.img, i + flX, canvas.height-100, 200, 100);
+        }
+    } else {
+        ctx.fillStyle = "#333";
+        ctx.fillRect(0, canvas.height-100, canvas.width, 100);
     }
 
-    // Balas
-    ctx.fillStyle = "yellow";
+    // Dibujar Balas
+    ctx.fillStyle = "#ff0";
     game.bullets.forEach((b, i) => {
         b.x += b.vx;
-        ctx.fillRect(b.x - game.camX, b.y, 10, 4);
+        ctx.fillRect(b.x - game.camX, b.y, 15, 6);
+        if(Math.abs(b.x - player.x) > 1000) game.bullets.splice(i,1);
     });
 
-    // JUGADOR (Mango)
+    // Dibujar Jugador
     ctx.save();
     ctx.translate(player.x - game.camX, player.y);
     if(player.dir === -1) { ctx.translate(player.w, 0); ctx.scale(-1, 1); }
@@ -154,11 +167,11 @@ function draw() {
     if(assets.p.loaded) {
         ctx.drawImage(assets.p.img, 0, 0, player.w, player.h);
     } else {
-        // EMERGENCIA: Si no hay imagen, dibuja un mango naranja
         ctx.fillStyle = "orange";
         ctx.fillRect(0, 0, player.w, player.h);
         ctx.fillStyle = "black";
-        ctx.fillText("MANGO", 10, 20);
+        ctx.font = "10px Arial";
+        ctx.fillText("MANGO", 5, 20);
     }
     ctx.restore();
 }
