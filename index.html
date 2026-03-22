@@ -5,76 +5,42 @@
     <title>🥭 MANGO CHAOS 🥭</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
-        * { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; }
-        body { background: #000; font-family: 'Permanent Marker', cursive; color: white; }
-        canvas { display: block; filter: contrast(1.1) saturate(1.2); }
-
-        /* FILTRO GRAFFITI */
-        svg { width: 0; height: 0; position: absolute; }
-
-        /* UI */
-        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
-
-        /* MENU MÁS PEQUEÑO */
+        * { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Permanent Marker', cursive; }
+        canvas { display: block; }
+        
+        #debug-info { position: absolute; top: 0; left: 0; color: lime; font-family: monospace; font-size: 10px; pointer-events: none; z-index: 1000; }
+        
+        #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; display: none; }
+        
         #menu {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.9);
+            position: absolute; inset: 0; background: #111;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 1000; pointer-events: all;
+            z-index: 1000; pointer-events: all; border: 5px solid #f0f;
         }
+
         .btn-play {
-            font-family: 'Permanent Marker'; font-size: 50px; color: #ff0; background: none; border: none;
-            cursor: pointer; text-shadow: 4px 4px 0 #f0f; transition: 0.2s; filter: url('#rough-edge');
+            font-size: 50px; color: #ff0; background: none; border: 3px solid #ff0;
+            padding: 10px 30px; cursor: pointer; text-shadow: 3px 3px 0 #f0f;
         }
 
-        /* BARRAS PEQUEÑAS */
-        #hud-life {
-            position: absolute; top: 15px; left: 15px; width: 180px; height: 35px;
-            background: rgba(0,0,0,0.7); border: 3px solid #fff; filter: url('#rough-edge'); transform: rotate(-1deg);
-        }
-        #hp-fill { width: 100%; height: 100%; background: #ff0055; transition: 0.2s; }
-
-        #swag-box {
-            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
-            width: 30px; height: 200px; border: 4px solid #0ff; filter: url('#rough-edge'); background: rgba(0,0,0,0.6);
-        }
-        #swag-fill { position: absolute; bottom: 0; width: 100%; height: 0%; background: #0ff; transition: 0.3s; }
-
-        /* ARMA CIRCULAR PEQUEÑA */
-        #weapon-ui {
-            position: absolute; bottom: 20px; left: 20px; width: 90px; height: 90px;
-            border: 5px solid #ff0; border-radius: 50%; background: rgba(0,0,0,0.9);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            filter: url('#rough-edge'); transform: rotate(-5deg);
-        }
-
-        /* DIALOGO COMPACTO */
-        #dialog {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 70%; min-height: 100px; background: rgba(10,10,10,0.95);
-            border: 5px solid #0ff; padding: 15px; display: none; pointer-events: all; filter: url('#rough-edge');
-        }
+        #hud-life { position: absolute; top: 15px; left: 15px; width: 150px; height: 25px; border: 2px solid #fff; }
+        #hp-fill { width: 100%; height: 100%; background: red; }
     </style>
 </head>
 <body>
 
-<svg><filter id="rough-edge"><feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise" /><feDisplacementMap in="SourceGraphic" in2="noise" scale="5" /></filter></svg>
+<div id="debug-info">Cargando recursos...</div>
 
 <div id="menu">
-    <h1 style="font-size: 70px; text-shadow: 6px 6px 0 #f0f;">MANGO CHAOS</h1>
+    <h1 style="font-size: 60px; color: white; margin-bottom: 20px;">MANGO CHAOS</h1>
+    <p style="color: #0ff; margin-bottom: 20px;">HAZ CLIC PARA ACTIVAR MÚSICA Y JUGAR</p>
     <button class="btn-play" onclick="startGame()">START</button>
 </div>
 
 <div id="ui">
     <div id="hud-life"><div id="hp-fill"></div></div>
-    <div id="swag-box"><div id="swag-fill"></div></div>
-    <div id="weapon-ui">
-        <img id="wpn-img" src="pistola.png" style="width: 50px;">
-        <div id="ammo-txt" style="font-size: 18px; color: #ff0;">25</div>
-    </div>
-    <div id="dialog" onclick="game.nextDialog()">
-        <img id="d-port" src="esposa.png" style="width: 70px; float: left; margin-right: 15px;">
-        <h2 id="d-name" style="color: #f0f; font-size: 22px;"></h2>
-        <p id="d-text" style="font-size: 16px;"></p>
+    <div id="weapon-box" style="position:absolute; bottom:20px; left:20px; color:yellow; font-size:20px;">
+        AMMO: <span id="ammo-txt">25</span>
     </div>
 </div>
 
@@ -83,82 +49,72 @@
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const debug = document.getElementById('debug-info');
 
-// --- AUDIO (menu_musicc.mp3) ---
-const audio = {
-    menu: new Audio('menu_musicc.mp3'),
-    current: null,
-    play(sound) {
-        if(this.current) this.current.pause();
-        this.current = sound;
-        this.current.loop = true;
-        this.current.play().catch(() => console.log("Click to play music"));
+// --- CARGA DE ARCHIVOS CON VERIFICACIÓN ---
+const assets = {
+    p: { src: 'jugador.png', img: new Image(), loaded: false },
+    bg: { src: 'fondo_ciudad.jpg', img: new Image(), loaded: false },
+    floor: { src: 'suelo_pasto.png', img: new Image(), loaded: false },
+    music: { src: 'menu_musicc.mp3', audio: new Audio(), loaded: false }
+};
+
+let loadedCount = 0;
+Object.entries(assets).forEach(([key, val]) => {
+    if(key === 'music') {
+        val.audio.src = val.src;
+        val.audio.oncanplaythrough = () => { val.loaded = true; checkAllLoaded(); };
+        val.audio.onerror = () => { debug.innerHTML += `<br>❌ Error Audio: ${val.src}`; };
+    } else {
+        val.img.src = val.src;
+        val.img.onload = () => { val.loaded = true; checkAllLoaded(); };
+        val.img.onerror = () => { debug.innerHTML += `<br>❌ Error Imagen: ${val.src}`; };
     }
-};
+});
 
-window.onclick = () => { if(!game.active && !audio.current) audio.play(audio.menu); };
+function checkAllLoaded() {
+    loadedCount++;
+    debug.innerHTML = `Recursos: ${loadedCount}/4 cargados.`;
+}
 
-// --- IMÁGENES ---
-const S = {
-    p: new Image(), w: new Image(), gun: new Image(), bg: new Image(), floor: new Image(), bullet: new Image()
-};
-S.p.src = 'jugador.png'; S.w.src = 'esposa.png'; S.gun.src = 'pistola.png';
-S.bg.src = 'fondo_ciudad.jpg'; S.floor.src = 'suelo_pasto.png'; S.bullet.src = 'bala.png';
+// --- AUDIO ---
+function playMenuMusic() {
+    assets.music.audio.loop = true;
+    assets.music.audio.play().catch(e => console.log("Audio block"));
+}
 
-const game = {
-    active: false, state: 'PLAYING', swag: 0, camX: 0,
-    bullets: [],
-    scripts: {
-        tut: [{n:"WIFE", t:"Mango! You're tiny! Move with A/D, Jump with Space. Q to Dash!", i:"esposa.png"}]
-    }
-};
-
-const player = {
-    x: 100, y: 0, vx: 0, vy: 0, w: 70, h: 80, // Mango más pequeño
-    hp: 100, dir: 1, angle: 0, grounded: false, ammo: 25
-};
+// --- JUEGO ---
+const game = { active: false, camX: 0, bullets: [] };
+const player = { x: 100, y: 100, vx: 0, vy: 0, w: 60, h: 70, dir: 1, grounded: false, ammo: 25 };
+const keys = {};
 
 function startGame() {
     document.getElementById('menu').style.display = 'none';
+    document.getElementById('ui').style.display = 'block';
     game.active = true;
-    game.state = 'DIALOG';
-    game.curS = game.scripts.tut;
-    game.dIdx = 0;
-    showDialog();
+    playMenuMusic();
 }
 
-function showDialog() {
-    const d = game.curS[game.dIdx];
-    document.getElementById('dialog').style.display = 'block';
-    document.getElementById('d-name').innerText = d.n;
-    document.getElementById('d-text').innerText = d.t;
-}
-
-game.nextDialog = () => {
-    game.state = 'PLAYING';
-    document.getElementById('dialog').style.display = 'none';
-};
-
-function shoot() {
-    if(player.ammo > 0 && game.state === 'PLAYING') {
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
+window.onmousedown = () => {
+    if(game.active && player.ammo > 0) {
         player.ammo--;
         document.getElementById('ammo-txt').innerText = player.ammo;
-        game.bullets.push({x: player.x + (player.dir*40), y: player.y + 40, vx: player.dir*15});
+        game.bullets.push({x: player.x + 30, y: player.y + 30, vx: player.dir * 12});
     }
-}
+};
 
 function update() {
-    if(game.active && game.state === 'PLAYING') {
-        let s = 1.1 + (game.swag/100);
-        if(keys.KeyD) { player.vx += s; player.dir = 1; }
-        if(keys.KeyA) { player.vx -= s; player.dir = -1; }
-        if(keys.Space && player.grounded) { player.vy = -16; player.grounded = false; }
+    if(game.active) {
+        if(keys.KeyD) { player.vx += 1; player.dir = 1; }
+        if(keys.KeyA) { player.vx -= 1; player.dir = -1; }
+        if(keys.Space && player.grounded) { player.vy = -15; player.grounded = false; }
 
-        player.vx *= 0.88; player.vy += 0.8;
+        player.vx *= 0.9; player.vy += 0.7;
         player.x += player.vx; player.y += player.vy;
 
-        if(player.y > canvas.height - 180) { player.y = canvas.height - 180; player.vy = 0; player.grounded = true; }
-        player.angle = player.vx * 0.05;
+        if(player.y > canvas.height - 150) { player.y = canvas.height - 150; player.vy = 0; player.grounded = true; }
         game.camX = player.x - canvas.width/3;
     }
     draw();
@@ -166,40 +122,46 @@ function update() {
 }
 
 function draw() {
-    ctx.clearRect(0,0,canvas.width, canvas.height);
+    ctx.fillStyle = "#111"; // Fondo oscuro por si falla la imagen
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     if(!game.active) return;
 
-    // Fondo y Suelo
-    if(S.bg.complete) ctx.drawImage(S.bg, -(game.camX*0.2)%canvas.width, 0, canvas.width, canvas.height);
-    if(S.floor.complete) {
-        for(let i=0; i<20; i++) ctx.drawImage(S.floor, (i*150)-(game.camX%150), canvas.height-100, 150, 100);
+    // Fondo
+    if(assets.bg.loaded) {
+        ctx.drawImage(assets.bg.img, -(game.camX*0.2)%canvas.width, 0, canvas.width, canvas.height);
     }
 
-    // Dibujar Esposa
-    if(S.w.complete) ctx.drawImage(S.w, 600 - game.camX, canvas.height-190, 80, 90);
+    // Suelo
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, canvas.height-80, canvas.width, 80);
+    if(assets.floor.loaded) {
+        for(let i=0; i<10; i++) ctx.drawImage(assets.floor.img, (i*200)-(game.camX%200), canvas.height-80, 200, 80);
+    }
 
-    // Dibujar Balas
+    // Balas
+    ctx.fillStyle = "yellow";
     game.bullets.forEach((b, i) => {
         b.x += b.vx;
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(b.x - game.camX, b.y, 15, 5);
-        if(Math.abs(b.x - player.x) > 1000) game.bullets.splice(i, 1);
+        ctx.fillRect(b.x - game.camX, b.y, 10, 4);
     });
 
-    // Dibujar Mango
+    // JUGADOR (Mango)
     ctx.save();
-    ctx.translate(player.x - game.camX + player.w/2, player.y + player.h/2);
-    ctx.rotate(player.angle);
-    if(player.dir === -1) ctx.scale(-1, 1);
-    if(S.p.complete) ctx.drawImage(S.p, -player.w/2, -player.h/2, player.w, player.h);
-    if(S.gun.complete) ctx.drawImage(S.gun, 20, 0, 45, 30);
+    ctx.translate(player.x - game.camX, player.y);
+    if(player.dir === -1) { ctx.translate(player.w, 0); ctx.scale(-1, 1); }
+    
+    if(assets.p.loaded) {
+        ctx.drawImage(assets.p.img, 0, 0, player.w, player.h);
+    } else {
+        // EMERGENCIA: Si no hay imagen, dibuja un mango naranja
+        ctx.fillStyle = "orange";
+        ctx.fillRect(0, 0, player.w, player.h);
+        ctx.fillStyle = "black";
+        ctx.fillText("MANGO", 10, 20);
+    }
     ctx.restore();
 }
-
-const keys = {};
-window.onkeydown = e => { keys[e.code] = true; if(e.code === 'KeyQ') player.vx = player.dir*35; };
-window.onkeyup = e => keys[e.code] = false;
-window.onmousedown = shoot;
 
 window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
 window.onresize();
